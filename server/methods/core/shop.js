@@ -11,6 +11,62 @@ import * as Collections from "/lib/collections";
 import * as Schemas from "/lib/collections/schemas";
 
 /**
+ * @name shop/updateBrandAsset
+ * @method
+ * @memberof Methods/Shop
+ * @param {Object} asset - brand asset {mediaId: "", type, ""}
+ * @param {String} shopId - the shop id coresponding to the shop for which
+ *                 the asset should be applied
+ * @return {Int} returns update result
+ */
+export function updateShopBrandAssets(asset, shopId) {
+  check(asset, {
+    mediaId: String,
+    type: String
+  });
+  check(shopId, String);
+
+  // must have core permissions
+  if (!Reaction.hasPermission("core", null, shopId)) {
+    throw new Meteor.Error("access-denied", "Access Denied");
+  }
+  this.unblock();
+
+  // Does our shop contain the brandasset we're tring to add
+  const shopWithBrandAsset = Collections.Shops.findOne({
+    "_id": shopId,
+    "brandAssets.type": asset.type
+  });
+
+  // If it does, then we update it with the new asset reference
+  if (shopWithBrandAsset) {
+    return Collections.Shops.update({
+      "_id": shopId,
+      "brandAssets.type": "navbarBrandImage"
+    }, {
+      $set: {
+        "brandAssets.$": {
+          mediaId: asset.mediaId,
+          type: asset.type
+        }
+      }
+    });
+  }
+
+  // Otherwise we insert a new brand asset reference
+  return Collections.Shops.update({
+    _id: shopId
+  }, {
+    $push: {
+      brandAssets: {
+        mediaId: asset.mediaId,
+        type: asset.type
+      }
+    }
+  });
+}
+
+/**
  * @file Meteor methods for Shop
  *
  *
@@ -855,44 +911,8 @@ Meteor.methods({
       mediaId: String,
       type: String
     });
-    // must have core permissions
-    if (!Reaction.hasPermission("core")) {
-      throw new Meteor.Error("access-denied", "Access Denied");
-    }
-    this.unblock();
 
-    // Does our shop contain the brandasset we're tring to add
-    const shopWithBrandAsset = Collections.Shops.findOne({
-      "_id": Reaction.getShopId(),
-      "brandAssets.type": asset.type
-    });
-
-    // If it does, then we update it with the new asset reference
-    if (shopWithBrandAsset) {
-      return Collections.Shops.update({
-        "_id": Reaction.getShopId(),
-        "brandAssets.type": "navbarBrandImage"
-      }, {
-        $set: {
-          "brandAssets.$": {
-            mediaId: asset.mediaId,
-            type: asset.type
-          }
-        }
-      });
-    }
-
-    // Otherwise we insert a new brand asset reference
-    return Collections.Shops.update({
-      _id: Reaction.getShopId()
-    }, {
-      $push: {
-        brandAssets: {
-          mediaId: asset.mediaId,
-          type: asset.type
-        }
-      }
-    });
+    return updateShopBrandAssets(asset, Reaction.getShopId());
   },
 
   /**
